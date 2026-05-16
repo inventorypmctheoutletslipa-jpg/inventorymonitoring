@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apple Inventory & Scanning Suite</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body class="bg-gray-100 font-sans min-h-screen p-6">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-md overflow-hidden p-6">
+        
+        <div class="flex flex-col lg:flex-row justify-between items-center border-b border-gray-200 pb-4 mb-6 gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Lima Estate Managed Matrix</h1>
+                <p class="text-sm text-gray-500">Supports Excel (.xlsx), Apple Numbers (.numbers), and CSV files</p>
+            </div>
+            
+            <div class="flex flex-col sm:flex-row items-stretch sm:items-center bg-gray-50 p-3 rounded-lg border border-dashed border-gray-300 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Import Data Matrix (Excel / Numbers / CSV):</label>
+                    <input type="file" id="csvFileInput" accept=".csv, .xlsx, .numbers" class="text-sm text-gray-500 file:mr-4 file:py-1.5 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer">
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-slate-900 rounded-xl p-4 mb-6 shadow-inner space-y-3">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="p-2 bg-blue-500/10 rounded-lg text-blue-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2zM9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h4a2 2 0 012 2v8a2 2 0 01-2 2zm6 0h4a2 2 0 002-2V6a2 2 0 00-2-2h4a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-white font-semibold text-sm">Hardware Scanner Terminal</h3>
+                        <p class="text-slate-400 text-xs">Scan barcode or type Product Code and hit Enter to process a sale</p>
+                    </div>
+                </div>
+                <div class="w-full md:w-auto flex gap-2">
+                    <input type="text" id="scannerInput" placeholder="Scan or Type Product Code..." class="w-full md:w-80 px-4 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white font-mono placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors">
+                    <button onclick="processManualScan()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg text-sm transition-colors cursor-pointer shrink-0">Process</button>
+                </div>
+            </div>
+
+            <div id="undoActionBanner" class="hidden flex items-center justify-between bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 text-xs text-amber-400 animate-fade-in">
+                <div class="flex items-center gap-2">
+                    <span class="inline-flex h-2 w-2 rounded-full bg-amber-500"></span>
+                    <span>Processed successfully: <strong id="undoItemLabel" class="text-white font-mono">None</strong></span>
+                </div>
+                <button onclick="triggerLastScanUndo()" class="bg-amber-600 hover:bg-amber-700 text-slate-900 font-bold px-3 py-1 rounded transition-colors cursor-pointer uppercase tracking-wider text-[10px]">
+                    Undo Last Scan
+                </button>
+            </div>
+        </div>
+
+        <div class="bg-gray-50 border border-gray-200 rounded-xl p-4 mb-6 space-y-4">
+            <div>
+                <span class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Category Segment</span>
+                <div class="flex flex-wrap gap-2" id="categoryFilters">
+                    <button onclick="filterCategory('All')" id="btn-All" class="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white shadow-sm transition-colors cursor-pointer">All Products</button>
+                    <button onclick="filterCategory('iPhone')" id="btn-iPhone" class="px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer">iPhone</button>
+                    <button onclick="filterCategory('iPad')" id="btn-iPad" class="px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer">iPad</button>
+                    <button onclick="filterCategory('Mac')" id="btn-Mac" class="px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer">Mac</button>
+                    <button onclick="filterCategory('Apple Watch')" id="btn-AppleWatch" class="px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer">Apple Watch</button>
+                    <button onclick="filterCategory('Apple TV')" id="btn-AppleTV" class="px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer">Apple TV</button>
+                </div>
+            </div>
+
+            <div id="subFilterContainer" class="hidden border-t border-gray-200 pt-3 animate-fade-in">
+                <span class="block text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Fast Find Model Sub-Filter</span>
+                <div id="subFilterButtons" class="flex flex-wrap gap-2">
+                    </div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <span class="block text-sm text-blue-600 font-medium">Total Unique Items</span>
+                <span id="totalItems" class="text-2xl font-bold text-blue-900">0</span>
+            </div>
+            <div class="bg-red-50 border border-red-200 rounded-lg p-4">
+                <span class="block text-sm text-red-600 font-medium">Critical Stock (1 - 4 Remaining)</span>
+                <span id="criticalItems" class="text-2xl font-bold text-red-900">0</span>
+            </div>
+            <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                <span class="block text-sm text-green-600 font-medium">Healthy Stock</span>
+                <span id="healthyItems" class="text-2xl font-bold text-green-900">0</span>
+            </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-lg border border-gray-200 shadow-sm">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-100">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">Product Code</th>
+                        <th class="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">Description</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-blue-50 border-r border-gray-200 w-32">Available Qty</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-gray-50 border-r border-gray-200 w-40">Reserve / Defective</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-rose-50 border-r border-gray-200 w-44">Sold</th>
+                        <th class="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider bg-indigo-50 w-36">Remaining Qty.</th>
+                    </tr>
+                </thead>
+                <tbody id="inventoryTableBody" class="bg-white divide-y divide-gray-200">
+                    <tr>
+                        <td colspan="6" class="px-6 py-10 text-center text-gray-400 italic">
+                            Please upload your matrix source spreadsheet file (.xlsx, .numbers, or .csv) to proceed.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let masterInventoryList = [];
+        let currentFilter = 'All';
+        let currentSubFilter = 'All';
+        let lastProcessedSku = null;
+
+        const subFilterKeywords = {
+            'iPhone': ['13', '14', '14 Plus', '15', '15 Plus', '15 Pro', '15 Pro Max', '16', '16 Plus', '16 Pro', '16 Pro Max', 'SE'],
+            'iPad': ['Generation', 'Mini', 'Air', 'Pro'],
+            'Mac': ['M1', 'M2', 'M3', 'M4', 'MacBook Air', 'MacBook Pro', 'Mac Mini', 'Mac Studio', 'iMac'],
+            'Apple Watch': ['SE', 'Series 8', 'Series 9', 'Series 10', 'Ultra', 'Ultra 2'],
+            'Apple TV': ['HD', '4K']
+        };
+
+        document.getElementById('csvFileInput').addEventListener('change', handleFileSelect, false);
+        
+        document.getElementById('scannerInput').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                processManualScan();
+            }
+        });
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const matrixRows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+                processMatrixArrays(matrixRows);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function processMatrixArrays(rows) {
+            masterInventoryList = [];
+            let currentGroupHeader = "General Inventory"; 
+            let targetQtyColumnIndex = -1;
+
+            for (let i = 0; i < rows.length; i++) {
+                const columns = rows[i];
+                if (!columns || columns.length === 0) continue;
+                
+                const rowCombinedText = columns.join(" ").toLowerCase();
+                if (rowCombinedText.includes("product code") || rowCombinedText.includes("description")) {
+                    for (let j = 0; j < columns.length; j++) {
+                        const hClean = String(columns[j]).toLowerCase().replace(/[^a-z0-9/ ]/g, '').trim();
+                        if (hClean.includes("available") || hClean.includes("qty") || hClean === "soh") {
+                            targetQtyColumnIndex = j;
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+
+            for (let i = 0; i < rows.length; i++) {
+                const columns = rows[i];
+                if (!columns || columns.length === 0) continue;
+
+                const colA = columns[0] ? String(columns[0]).trim() : "";
+                const colB = columns[1] ? String(columns[1]).trim() : "";
+                
+                if (!colA) continue;
+
+                const upperA = colA.toUpperCase();
+                if (upperA.includes("LIMA ESTATE") || upperA.includes("DATE:") || upperA === "PRODUCT CODE") {
+                    continue;
+                }
+
+                const trailingValues = columns.slice(2).map(v => String(v).trim()).filter(v => v !== "");
+                if (colA && colB === "" && trailingValues.length === 0) {
+                    currentGroupHeader = colA;
+                    continue; 
+                }
+
+                const sku = colA;
+                const name = colB;
+
+                let availableQty = 0;
+                if (targetQtyColumnIndex !== -1 && columns[targetQtyColumnIndex] !== undefined && String(columns[targetQtyColumnIndex]).trim() !== "") {
+                    availableQty = parseInt(String(columns[targetQtyColumnIndex]).trim(), 10) || 0;
+                } else {
+                    const numericValues = columns.slice(2).map(v => String(v).trim()).filter(v => v !== "" && !isNaN(v));
+                    if (numericValues.length > 0) {
+                        availableQty = parseInt(numericValues[0], 10) || 0;
+                    }
+                }
+
+                if (availableQty <= 0) continue;
+
+                let determinedCategory = "Other";
+                const searchString = (currentGroupHeader + " " + name + " " + sku).toUpperCase();
+                
+                if (searchString.includes("IPHONE")) determinedCategory = "iPhone";
+                else if (searchString.includes("IPAD")) determinedCategory = "iPad";
+                else if (searchString.includes("MAC") || searchString.includes("MACBOOK")) determinedCategory = "Mac";
+                else if (searchString.includes("WATCH")) determinedCategory = "Apple Watch";
+                else if (searchString.includes("TV")) determinedCategory = "Apple TV";
+
+                if (determinedCategory === "Other") continue;
+
+                const reserve = 0; 
+                const sold = 0;    
+                const remaining = Math.max(0, availableQty - reserve - sold);
+
+                masterInventoryList.push({
+                    sku,
+                    name,
+                    category: determinedCategory,
+                    group: currentGroupHeader,
+                    availableQty,
+                    reserve,
+                    sold,
+                    remaining
+                });
+            }
+
+            document.getElementById('undoActionBanner').classList.add('hidden');
+            lastProcessedSku = null;
+
+            resortMasterInventory();
+            currentFilter = 'All';
+            currentSubFilter = 'All';
+            renderSubFilters();
+            applyFilterAndRender();
+        }
+
+        function resortMasterInventory() {
+            masterInventoryList.sort((a, b) => {
+                const cleanA = a.name.toLowerCase();
+                const cleanB = b.name.toLowerCase();
+                return cleanA.localeCompare(cleanB, undefined, { numeric: true, sensitivity: 'base' });
+            });
+        }
+
+        function processManualScan() {
+            const inputField = document.getElementById('scannerInput');
+            const targetSku = inputField.value.trim();
+            if (!targetSku) return;
+
+            const itemMatch = masterInventoryList.find(item => item.sku.toUpperCase() === targetSku.toUpperCase());
+
+            if (itemMatch) {
+                itemMatch.sold += 1;
+                recalculateItemRemaining(itemMatch);
+                
+                lastProcessedSku = itemMatch.sku;
+                document.getElementById('undoItemLabel').innerText = `[${itemMatch.sku}] ${itemMatch.name}`;
+                document.getElementById('undoActionBanner').classList.remove('hidden');
+
+                inputField.value = '';
+                inputField.focus();
+                
+                applyFilterAndRender();
+            } else {
+                alert(`Product Code "${targetSku}" not located in active inventory data lists.`);
+                inputField.select();
+            }
+        }
+
+        function triggerLastScanUndo() {
+            if (!lastProcessedSku) return;
+
+            const itemMatch = masterInventoryList.find(item => item.sku === lastProcessedSku);
+            if (itemMatch && itemMatch.sold > 0) {
+                itemMatch.sold -= 1;
+                recalculateItemRemaining(itemMatch);
+                
+                document.getElementById('undoActionBanner').classList.add('hidden');
+                lastProcessedSku = null;
+                
+                applyFilterAndRender();
+            }
+        }
+
+        function handleReserveChange(sku, newReserveValue) {
+            const parsedVal = parseInt(newReserveValue, 10) || 0;
+            const itemMatch = masterInventoryList.find(item => item.sku === sku);
+            
+            if (itemMatch) {
+                itemMatch.reserve = Math.max(0, parsedVal);
+                recalculateItemRemaining(itemMatch);
+                updateKPICountersOnly();
+            }
+        }
+
+        // NEW: Handles interactive mutations inside the new operational 'Sold' options cell column
+        function handleSoldChange(sku, newSoldValue) {
+            const parsedVal = parseInt(newSoldValue, 10) || 0;
+            const itemMatch = masterInventoryList.find(item => item.sku === sku);
+            
+            if (itemMatch) {
+                itemMatch.sold = Math.max(0, parsedVal);
+                recalculateItemRemaining(itemMatch);
+                updateKPICountersOnly();
+            }
+        }
+
+        // NEW: Adjusts Sold counts up/down via localized row click indicators
+        function adjustSoldStep(sku, stepDirection) {
+            const itemMatch = masterInventoryList.find(item => item.sku === sku);
+            if (itemMatch) {
+                const updatedTarget = itemMatch.sold + stepDirection;
+                itemMatch.sold = Math.max(0, updatedTarget);
+                recalculateItemRemaining(itemMatch);
+                updateKPICountersOnly();
+            }
+        }
+
+        function recalculateItemRemaining(item) {
+            item.remaining = Math.max(0, item.availableQty - item.reserve - item.sold);
+            
+            // Live update the cell rendering view elements
+            const cellElement = document.getElementById(`remaining-cell-${item.sku}`);
+            if (cellElement) {
+                cellElement.innerText = item.remaining;
+                cellElement.className = "px-4 py-3 text-center font-bold " + 
+                    (item.remaining === 0 ? "text-red-600 bg-red-50" : item.remaining < 5 ? "text-amber-600 bg-amber-50" : "text-blue-600");
+            }
+            
+            const soldInput = document.getElementById(`sold-input-${item.sku}`);
+            if (soldInput) soldInput.value = item.sold;
+        }
+
+        function filterCategory(category) {
+            currentFilter = category;
+            currentSubFilter = 'All';
+            
+            const buttons = document.querySelectorAll('#categoryFilters button');
+            buttons.forEach(btn => {
+                btn.className = "px-4 py-2 text-sm font-medium rounded-lg bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 transition-colors cursor-pointer";
+            });
+
+            const safeId = "btn-" + category.replace(/\s+/g, '');
+            const activeBtn = document.getElementById(safeId);
+            if(activeBtn) {
+                activeBtn.className = "px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white shadow-sm transition-colors cursor-pointer";
+            }
+
+            renderSubFilters();
+            applyFilterAndRender();
+        }
+
+        function renderSubFilters() {
+            const container = document.getElementById('subFilterContainer');
+            const buttonWrapper = document.getElementById('subFilterButtons');
+            
+            if (currentFilter === 'All' || !subFilterKeywords[currentFilter]) {
+                container.classList.add('hidden');
+                return;
+            }
+
+            container.classList.remove('hidden');
+            buttonWrapper.innerHTML = '';
+
+            const allBtn = document.createElement('button');
+            allBtn.innerText = `All ${currentFilter}s`;
+            allBtn.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-slate-700 text-white shadow-sm cursor-pointer transition-colors";
+            allBtn.id = "sub-btn-All";
+            allBtn.onclick = () => filterSubCategory('All');
+            buttonWrapper.appendChild(allBtn);
+
+            subFilterKeywords[currentFilter].forEach(kw => {
+                const keywordExists = masterInventoryList.some(item => 
+                    item.category === currentFilter && item.name.toUpperCase().includes(kw.toUpperCase())
+                );
+
+                if (keywordExists) {
+                    const btn = document.createElement('button');
+                    btn.innerText = kw;
+                    btn.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 cursor-pointer transition-colors";
+                    btn.id = "sub-btn-" + kw.replace(/\s+/g, '');
+                    btn.onclick = () => filterSubCategory(kw);
+                    buttonWrapper.appendChild(btn);
+                }
+            });
+        }
+
+        function filterSubCategory(subValue) {
+            currentSubFilter = subValue;
+
+            const buttons = document.querySelectorAll('#subFilterButtons button');
+            buttons.forEach(btn => {
+                btn.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-white border border-gray-200 text-gray-600 hover:bg-gray-100 cursor-pointer transition-colors";
+            });
+
+            const safeId = "sub-btn-" + subValue.replace(/\s+/g, '');
+            const activeBtn = document.getElementById(safeId);
+            if (activeBtn) {
+                activeBtn.className = "px-3 py-1.5 text-xs font-medium rounded-md bg-slate-700 text-white shadow-sm cursor-pointer transition-colors";
+            }
+
+            applyFilterAndRender();
+        }
+
+        function applyFilterAndRender() {
+            let filteredItems = masterInventoryList;
+
+            if (currentFilter !== 'All') {
+                filteredItems = filteredItems.filter(item => item.category === currentFilter);
+            }
+
+            if (currentSubFilter !== 'All') {
+                filteredItems = filteredItems.filter(item => 
+                    item.name.toUpperCase().includes(currentSubFilter.toUpperCase())
+                );
+            }
+
+            renderTable(filteredItems);
+            updateKPIs(filteredItems);
+        }
+
+        function renderTable(items) {
+            const tbody = document.getElementById('inventoryTableBody');
+            tbody.innerHTML = ''; 
+
+            if (items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-gray-400 italic">No inventory entries match selection criteria.</td></tr>`;
+                return;
+            }
+
+            let lastGroup = "";
+
+            items.forEach(item => {
+                if (item.group !== lastGroup) {
+                    lastGroup = item.group;
+                    const headerRow = document.createElement('tr');
+                    headerRow.className = "bg-black text-white font-bold tracking-wide";
+                    headerRow.innerHTML = `
+                        <td colspan="2" class="px-4 py-1.5 text-xs font-mono uppercase">${item.group}</td>
+                        <td class="text-center py-1.5 text-xs">0</td>
+                        <td class="text-center py-1.5 text-xs">0</td>
+                        <td class="text-center py-1.5 text-xs">0</td>
+                        <td class="text-center py-1.5 text-xs text-blue-400">0</td>
+                    `;
+                    tbody.appendChild(headerRow);
+                }
+
+                const row = document.createElement('tr');
+                row.className = "hover:bg-gray-50 border-b border-gray-100 transition-colors text-sm text-gray-800";
+
+                let remainingCellClass = "px-4 py-3 text-center font-bold text-blue-600";
+                if (item.remaining === 0) {
+                    remainingCellClass = "px-4 py-3 text-center font-bold text-red-600 bg-red-50";
+                } else if (item.remaining < 5) {
+                    remainingCellClass = "px-4 py-3 text-center font-medium text-amber-600 bg-amber-50";
+                }
+
+                // CHANGED: The Sold table cell data layout has been updated with step controllers and interactive parameters
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-mono text-gray-500 border-r border-gray-200">${item.sku}</td>
+                    <td class="px-4 py-3 font-medium text-gray-900 border-r border-gray-200">${item.name}</td>
+                    <td class="px-4 py-3 text-center border-r border-gray-200 bg-blue-50/20">${item.availableQty}</td>
+                    <td class="px-4 py-2 border-r border-gray-200 bg-gray-50 text-center">
+                        <input type="number" min="0" value="${item.reserve}" 
+                            oninput="handleReserveChange('${item.sku}', this.value)" 
+                            class="w-20 px-2 py-1 text-center border border-gray-300 rounded focus:outline-none focus:border-blue-500 bg-white">
+                    </td>
+                    <td class="px-4 py-2 border-r border-gray-200 bg-rose-50/30 text-center">
+                        <div class="inline-flex items-center justify-center gap-1">
+                            <button onclick="adjustSoldStep('${item.sku}', -1)" class="w-7 h-7 bg-white hover:bg-rose-100 text-rose-700 font-bold border border-gray-300 rounded flex items-center justify-center transition-colors shadow-sm select-none cursor-pointer text-xs">-</button>
+                            <input type="number" min="0" id="sold-input-${item.sku}" value="${item.sold}" 
+                                oninput="handleSoldChange('${item.sku}', this.value)" 
+                                class="w-16 px-1 py-1 text-center font-semibold text-rose-700 border border-gray-300 rounded focus:outline-none focus:border-rose-500 bg-white text-sm">
+                            <button onclick="adjustSoldStep('${item.sku}', 1)" class="w-7 h-7 bg-white hover:bg-rose-100 text-rose-700 font-bold border border-gray-300 rounded flex items-center justify-center transition-colors shadow-sm select-none cursor-pointer text-xs">+</button>
+                        </div>
+                    </td>
+                    <td id="remaining-cell-${item.sku}" class="${remainingCellClass}">${item.remaining}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updateKPIs(items) {
+            const total = items.length;
+            const critical = items.filter(item => item.remaining > 0 && item.remaining < 5).length;
+            const healthy = items.filter(item => item.remaining >= 5).length;
+
+            document.getElementById('totalItems').innerText = total;
+            document.getElementById('criticalItems').innerText = critical;
+            document.getElementById('healthyItems').innerText = healthy;
+        }
+
+        function updateKPICountersOnly() {
+            let filteredItems = currentFilter === 'All' 
+                ? masterInventoryList 
+                : masterInventoryList.filter(item => item.category === currentFilter);
+            
+            if (currentSubFilter !== 'All') {
+                filteredItems = filteredItems.filter(item => 
+                    item.name.toUpperCase().includes(currentSubFilter.toUpperCase())
+                );
+            }
+            updateKPIs(filteredItems);
+        }
+    </script>
+</body>
+</html>
